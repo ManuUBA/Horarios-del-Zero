@@ -1,18 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Horarios del Zero</title>
-<script defer src="app.js"></script>
 <style>
-body { font-family: Arial; padding: 20px; }
-pre { background: #f0f0f0; padding: 10px; border-radius: 6px; }
+    body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+    h2 { margin-top: 30px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; background: white; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    .container { background: white; padding: 20px; border-radius: 8px; }
 </style>
 </head>
+
 <body>
-<h1>Horarios del Zero</h1>
-<div id="info-actual"></div>
-<h2>Resultado</h2>
-<pre id="resultado"></pre>
+<div class="container">
+    <h1>Horarios del Zero</h1>
+
+    <p id="info-actual"></p>
+
+    <h2>🟢 Labos libres ahora</h2>
+    <table id="tabla-ahora">
+        <tr><th>Labo</th><th>Tiempo libre</th></tr>
+    </table>
+
+    <h2>🕒 Labos que se liberan en ≤ 30 min</h2>
+    <table id="tabla-luego">
+        <tr><th>Labo</th><th>Se libera en</th><th>Tiempo libre después</th></tr>
+    </table>
+
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
