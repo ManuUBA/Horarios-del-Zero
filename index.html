@@ -1,38 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <meta charset="utf-8">
-    <title>Horarios del 0+∞ (UBA)</title>
-    <style>
-        body { font-family: Arial; padding: 20px; background: #fafafa; }
-        table { border-collapse: collapse; margin-top: 10px; width: 100%; }
-        td, th { border: 1px solid #ccc; padding: 6px; text-align: left; }
-        h2 { margin-top: 30px; }
-    </style>
+<meta charset="UTF-8">
+<title>Horarios del 0+∞</title>
+<style>
+body { font-family: Arial; margin: 20px; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+th { background: #eee; }
+</style>
 </head>
 <body>
 
-<h1>Horarios del 0+∞ (UBA) </h1>
-
-<div id="info-actual">Cargando…</div>
+<h1>Horarios del 0+∞</h1>
+<p id="info-actual"></p>
 
 <h2>🟢 Labos libres ahora</h2>
 <table>
-    <thead>
-        <tr><th>Labo</th><th>Tiempo libre</th></tr>
-    </thead>
-    <tbody id="tabla-libres"></tbody>
+<thead><tr><th>Labo</th><th>Tiempo libre</th></tr></thead>
+<tbody id="tabla-ahora"></tbody>
 </table>
 
-<h2 id="titulo-liberan">🕒 Labos que se liberan…</h2>
+<h2>🕒 Labos que se liberan en ≤ 30 min</h2>
 <table>
-    <thead>
-        <tr><th>Labo</th><th>Tiempo libre después</th></tr>
-    </thead>
-    <tbody id="tabla-liberan"></tbody>
+<thead><tr><th>Labo</th><th>Se libera en</th><th>Tiempo libre después</th></tr></thead>
+<tbody id="tabla-luego"></tbody>
 </table>
-
 
 <script src="app.js"></script>
+
 </body>
 </html>
