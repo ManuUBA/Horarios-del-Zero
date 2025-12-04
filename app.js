@@ -1,181 +1,103 @@
-const base = "https://rawcdn.githack.com/ManuUBA/Horarios-de-labos-zero/main/data/";
-const LABOS = Array.from({length: 10}, (_, i) => 1103 + i); // 1103..1112
-
-// -------------------------------
-//  Conversión de horas
-// -------------------------------
-function horaADec(h) {
-    const [H, M] = h.split(":").map(Number);
-    return H + M / 60;
-}
-
-function decAHora(dec) {
-    const H = Math.floor(dec);
-    const M = Math.round((dec - H) * 60);
-    return `${String(H).padStart(2, "0")}:${String(M).padStart(2, "0")}`;
-}
-
-// -------------------------------
-//  Leer CSV real desde GitHub RAW
-// -------------------------------
 async function cargarCSV(dia) {
-    const url = `${base}${dia}.csv`;
-    const res = await fetch(url);
-    const texto = await res.text();
+  const url = `https://raw.githubusercontent.com/ManuUBA/Horarios-de-labos-zero/main/data/${dia}.csv`;
+  const resp = await fetch(url);
+  const texto = await resp.text();
+  const lineas = texto.split("\n").slice(1);
 
-    const filas = texto
-        .split("\n")
-        .map(l => l.split(","))
-        .filter(f => f.length > 7);  // columnas suficientes
-
-    const datos = {};
-
-    for (const f of filas) {
-        const pab = f[6]?.trim();
-        const aula = parseInt(f[7]);
-        const inicio = f[4]?.trim();
-        const fin = f[5]?.trim();
-
-        if (pab === "0" && LABOS.includes(aula) && inicio && fin) {
-            if (!datos[aula]) datos[aula] = [];
-            datos[aula].push([inicio, fin]);
-        }
-    }
-
-    return datos;
+  return lineas
+    .map(l => l.split(","))
+    .filter(cols => cols.length >= 8 && cols[7].trim() !== "")
+    .map(cols => ({
+      inicio: cols[4].trim(),
+      fin: cols[5].trim(),
+      aula: parseInt(cols[7].trim())
+    }));
 }
 
-// -------------------------------
-//  Labos libres ahora
-// -------------------------------
-async function labosLibres(dia, hora) {
-    const horarios = await cargarCSV(dia);
-    const hdec = horaADec(hora);
+function aMinutos(hora) {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
 
-    const libres = [];
+function minutosAHora(min) {
+  if (min === Infinity) return "todo el día";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}h ${m}m`;
+}
 
-    for (const labo of LABOS) {
-        const turnos = horarios[labo] || [];
-        const ocupado = turnos.some(([ini, fin]) => {
-            const a = horaADec(ini);
-            const b = horaADec(fin);
-            return hdec >= a && hdec < b;
+async function aplicacion() {
+  const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  const hoy = new Date();
+  const dia = dias[hoy.getDay()];
+  const horaActual = `${String(hoy.getHours()).padStart(2,"0")}:${String(hoy.getMinutes()).padStart(2,"0")}`;
+  const ahoraMin = aMinutos(horaActual);
+
+  document.getElementById("info").innerText =
+    `Día detectado: ${dia} — Hora detectada: ${horaActual}`;
+
+  const clases = await cargarCSV(dia);
+  const aulas = [...new Set(clases.map(c => c.aula))];
+
+  let libresAhora = [];
+  let seLiberanPronto = [];
+
+  for (let aula of aulas) {
+    const ocupaciones = clases.filter(c => c.aula === aula);
+    let estaOcupado = false;
+    let finActual = Infinity;
+
+    for (let c of ocupaciones) {
+      const ini = aMinutos(c.inicio);
+      const fin = aMinutos(c.fin);
+
+      if (ini <= ahoraMin && ahoraMin < fin) {
+        estaOcupado = true;
+        finActual = fin;
+      }
+    }
+
+    if (!estaOcupado) {
+      // Tiempo libre hasta la próxima clase
+      const proximas = ocupaciones
+        .map(c => aMinutos(c.inicio))
+        .filter(t => t > ahoraMin);
+
+      const tiempoLibre = proximas.length > 0 ? proximas[0] - ahoraMin : Infinity;
+      libresAhora.push({ aula, tiempoLibre });
+    } else {
+      // Se libera en <= 30 min
+      const minutosRestantes = finActual - ahoraMin;
+      if (minutosRestantes <= 30) {
+        // Calculamos cuánto tiempo queda libre DESPUÉS de que se libera
+        const proximasDespues = ocupaciones
+          .map(c => aMinutos(c.inicio))
+          .filter(t => t > finActual);
+
+        const tiempoLibre = proximasDespues.length > 0 ? proximasDespues[0] - finActual : Infinity;
+
+        seLiberanPronto.push({
+          aula,
+          tiempoLibre
         });
-        if (!ocupado) libres.push(labo);
+      }
     }
+  }
 
-    return { horarios, libres };
+  // Pintar tablas
+  const tbodyAhora = document.querySelector("#tablaAhora tbody");
+  const tbodyLuego = document.querySelector("#tablaLuego tbody");
+
+  tbodyAhora.innerHTML = "";
+  tbodyLuego.innerHTML = "";
+
+  libresAhora.forEach(l =>
+    tbodyAhora.innerHTML += `<tr><td>${l.aula}</td><td>${minutosAHora(l.tiempoLibre)}</td></tr>`
+  );
+
+  seLiberanPronto.forEach(l =>
+    tbodyLuego.innerHTML += `<tr><td>${l.aula}</td><td>${minutosAHora(l.tiempoLibre)}</td></tr>`
+  );
 }
 
-// -------------------------------
-//  Tiempo restante hasta el próximo turno
-// -------------------------------
-function tiempoRestante(labo, horarios, hora) {
-    const h = horaADec(hora);
-    const turnos = horarios[labo] || [];
-
-    const futuros = turnos
-        .map(([ini]) => horaADec(ini))
-        .filter(t => t > h);
-
-    if (!futuros.length) return "todo el día";
-
-    const prox = Math.min(...futuros);
-    const min = Math.round((prox - h) * 60);
-    const H = Math.floor(min / 60);
-    const M = min % 60;
-
-    return `${String(H).padStart(2,"0")}:${String(M).padStart(2,"0")}`;
-}
-
-// -------------------------------
-//  Se libera en ≤ 30 min?
-// -------------------------------
-function minutos(h) {
-    const [H, M] = h.split(":").map(Number);
-    return H * 60 + M;
-}
-
-function seLiberaEnMediaHora(turnos, ahoraMin) {
-    for (const [ini, fin] of turnos) {
-        const finMin = minutos(fin);
-        if (finMin > ahoraMin && finMin <= ahoraMin + 30) {
-            return finMin;
-        }
-    }
-    return null;
-}
-
-// -------------------------------
-//  FUNCIÓN PRINCIPAL
-// -------------------------------
-async function aplicacion(dia, hora) {
-    const { horarios, libres } = await labosLibres(dia, hora);
-
-    // Tabla 1
-    const tiemposAhora = libres.map(l => tiempoRestante(l, horarios, hora));
-
-    // Tabla 2
-    const ahoraMin = minutos(hora);
-    const liberaPronto = [];
-
-    for (const labo of LABOS) {
-        if (libres.includes(labo)) continue; // ya libre, no va acá
-
-        const turnos = horarios[labo] || [];
-        const fin = seLiberaEnMediaHora(turnos, ahoraMin);
-
-        if (fin !== null) {
-            const horaLiberacion = decAHora(fin / 60);
-            liberaPronto.push({
-                labo,
-                seLiberaEn: horaLiberacion,
-                librePor: tiempoRestante(labo, horarios, horaLiberacion)
-            });
-        }
-    }
-
-    return {
-        ahora: {
-            libres,
-            tiempos: tiemposAhora
-        },
-        luego: liberaPronto
-    };
-}
-
-// -------------------------------
-//  AUTODETECCIÓN DE FECHA/HORA
-// -------------------------------
-function obtenerDiaYHoraActual() {
-    const d = new Date();
-    const dias = ["Domingo","Lunes","Martes","Miercoles","Jueves","Viernes","Sabado"];
-    const dia = dias[d.getDay()];
-    const h = String(d.getHours()).padStart(2,"0");
-    const m = String(d.getMinutes()).padStart(2,"0");
-    return { dia, hora: `${h}:${m}` };
-}
-
-// -------------------------------
-//  Render en HTML
-// -------------------------------
-window.onload = async () => {
-    const { dia, hora } = obtenerDiaYHoraActual();
-
-    document.getElementById("info-actual").innerText =
-        `Día detectado: ${dia} — Hora detectada: ${hora}`;
-
-    const r = await aplicacion(dia, hora);
-
-    // Tabla 1
-    const t1 = document.getElementById("tabla-ahora");
-    t1.innerHTML = r.ahora.libres.map(
-        (l, i) => `<tr><td>${l}</td><td>${r.ahora.tiempos[i]}</td></tr>`
-    ).join("");
-
-    // Tabla 2
-    const t2 = document.getElementById("tabla-luego");
-    t2.innerHTML = r.luego.map(
-        o => `<tr><td>${o.labo}</td><td>${o.seLiberaEn}</td><td>${o.librePor}</td></tr>`
-    ).join("");
-};
+aplicacion();
