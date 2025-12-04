@@ -185,7 +185,7 @@ function App() {
             <div className="p-3 bg-slate-100 rounded">
               <b>Libres ahora:</b> {resultado.libresNow.join(", ") || "Ninguno"}
               <div className="text-sm text-slate-600">
-                <b>Tiempo restante hasta la próxima clase:{resultado.tiemposNow.join(" | ")}</b>
+                <b>Tiempo restante hasta la próxima clase: {resultado.tiemposNow.join(" | ")}</b>
               </div>
             </div>
 
@@ -194,7 +194,7 @@ function App() {
                 <b>Libres desde {resultado.horaNext}:</b>{" "}
                 {resultado.nuevos.join(", ")}
                 <div className="text-sm text-slate-600">
-                  <b>Tiempo restante hasta la próxima clase:{resultado.tiemposNext.join(" | ")}</b>
+                  <b>Tiempo restante hasta la próxima clase: {resultado.tiemposNext.join(" | ")}</b>
                 </div>
               </div>
             ) : (
