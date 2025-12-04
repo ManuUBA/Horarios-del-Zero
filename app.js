@@ -1,164 +1,167 @@
-// =========================
+//---------------------------------------------
 // CONFIG
-// =========================
-
-const base = "https://rawcdn.githack.com/ManuUBA/Horarios-de-labos-zero/main/data/";
-const labos = Array.from({ length: 10 }, (_, i) => 1103 + i); 
-const diasValidos = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado"];
-
-// =========================
-// UTILIDADES DE HORA
-// =========================
+//---------------------------------------------
+const base = "https://manuuba.github.io/Horarios-de-labos-zero/";
+async function cargarCSV(url) {
+    const r = await fetch(url);
+    const txt = await r.text();
+    return txt.trim().split("\n").slice(1).map(l => l.split(","));
+}
 
 function horaADec(h) {
-    const [hh, mm] = h.split(":").map(Number);
-    return hh + mm/60;
+    const [H, M] = h.split(":").map(Number);
+    return H + M / 60;
+}
+function decAHora(d) {
+    const H = Math.floor(d);
+    const M = Math.round((d - H) * 60);
+    return `${String(H).padStart(2,"0")}:${String(M).padStart(2,"0")}`;
 }
 
-function decAHora(dec) {
-    const h = Math.floor(dec);
-    const m = Math.round((dec - h)*60);
-    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-}
-
-// =========================
-// LECTURA CSV
-// =========================
-
+//---------------------------------------------
+// Cargar horarios de un día
+//---------------------------------------------
 async function obtenerHorarios(dia) {
-    const url = `${base}${dia}.csv`;
-    const txt = await fetch(url).then(r => r.text());
+    const filas = await cargarCSV(`${base}${dia}.csv`);
+    const datos = {};
 
-    const lineas = txt.split("\n").map(l => l.split(","));
-    let idxHeader = lineas.findIndex(
-        row => row.some(c => c.toLowerCase().includes("aula"))
-    );
-
-    if (idxHeader === -1) return {};
-
-    const header = lineas[idxHeader].map(h => h.trim().toLowerCase());
-    const datos = lineas.slice(idxHeader + 1);
-
-    function col(name) {
-        return header.findIndex(h => h.includes(name.toLowerCase()));
+    for (let [labo, ini, fin] of filas) {
+        labo = parseInt(labo);
+        if (!datos[labo]) datos[labo] = [];
+        datos[labo].push([horaADec(ini), horaADec(fin)]);
     }
-
-    const cAula = col("aula");
-    const cIni  = col("inicio");
-    const cFin  = col("fin");
-    const cPab  = col("pab");
-
-    const horarios = {};
-    labos.forEach(l => horarios[l] = []);
-
-    for (const f of datos) {
-        if (!f[cPab]) continue;
-        if (f[cPab].trim() !== "0") continue;
-
-        const aula = Number(f[cAula]);
-        if (!labos.includes(aula)) continue;
-
-        horarios[aula].push([f[cIni].trim(), f[cFin].trim()]);
-    }
-
-    return horarios;
+    return datos;
 }
 
-// =========================
-// FUNCIONES PRINCIPALES
-// =========================
-
-async function labosLibres(dia, hora) {
-    const hdec = horaADec(hora);
+//---------------------------------------------
+// Tiempo restante libre de un labo
+//---------------------------------------------
+async function tiempoRestante(labo, dia, hora) {
     const horarios = await obtenerHorarios(dia);
+    const hdec = horaADec(hora);
+    const turnos = horarios[labo] || [];
+    const proximos = turnos.map(([ini]) => ini).filter(t => t > hdec);
+
+    if (proximos.length) {
+        const proximo = Math.min(...proximos);
+        const min = Math.round((proximo - hdec) * 60);
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    }
+    return "todo el día";
+}
+
+//---------------------------------------------
+// Labos libres ahora
+//---------------------------------------------
+async function labosLibres(dia, hora) {
+    const horarios = await obtenerHorarios(dia);
+    const h = horaADec(hora);
 
     const libres = [];
 
-    for (const labo of labos) {
-        const turnos = horarios[labo] || [];
-        const ocupado = turnos.some(([ini, fin]) => {
-            const a = horaADec(ini);
-            const b = horaADec(fin);
-            return a <= hdec && hdec < b;
-        });
+    for (let labo in horarios) {
+        const ocupado = horarios[labo].some(([ini, fin]) => ini <= h && h < fin);
+        if (!ocupado) libres.push(parseInt(labo));
+    }
+    return libres.sort((a,b)=>a-b);
+}
 
-        if (!ocupado) libres.push(labo);
+//---------------------------------------------
+// Función auxiliar: detecta si un labo se libera en ≤ 30 min
+//---------------------------------------------
+function seLiberaEnMediaHora(intervalos, hdec) {
+    const limite = hdec + 0.5; // 30 min
+    for (let [ini, fin] of intervalos) {
+        if (ini > hdec && ini <= limite) return ini;
+    }
+    return null;
+}
+
+//---------------------------------------------
+// Aplicación principal
+//---------------------------------------------
+async function aplicacion(dia, hora) {
+
+    const hdec = horaADec(hora);
+    const horariosDia = await obtenerHorarios(dia);
+
+    // Tabla 1: libres ahora
+    const libresAhora = await labosLibres(dia, hora);
+    const tiemposAhora = await Promise.all(
+        libresAhora.map(l => tiempoRestante(l, dia, hora))
+    );
+
+    // Tabla 2: se liberan en 30 min
+    const liberan = [];
+
+    for (let labo in horariosDia) {
+        labo = parseInt(labo);
+
+        if (libresAhora.includes(labo)) continue;
+
+        const turnos = horariosDia[labo];
+        const ini = seLiberaEnMediaHora(turnos, hdec);
+
+        if (ini !== null) {
+            const minutos = Math.round((ini - hdec) * 60);
+            const libreDespues = await tiempoRestante(labo, dia, decAHora(ini));
+
+            liberan.push({
+                labo,
+                en: `${minutos} min`,
+                librePor: libreDespues
+            });
+        }
     }
 
-    return libres;
-}
-
-async function tiempoRestante(labo, dia, hora) {
-    const hdec = horaADec(hora);
-    const horarios = await obtenerHorarios(dia);
-    const turnos = horarios[labo] || [];
-
-    const proximos = turnos
-        .map(([ini]) => horaADec(ini))
-        .filter(t => t > hdec);
-
-    if (proximos.length === 0) return "todo el día";
-
-    const proximo = Math.min(...proximos);
-    const min = Math.round((proximo - hdec)*60);
-
-    const h = Math.floor(min/60);
-    const m = min % 60;
-
-    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-}
-
-async function aplicacion(dia, hora) {
-    const libres = await labosLibres(dia, hora);
-    const tiempos = await Promise.all(libres.map(l => tiempoRestante(l, dia, hora)));
-
-    // Media hora siguiente o hora siguiente
-    let hdec = horaADec(hora);
-    let frac = hdec - Math.floor(hdec);
-
-    if (frac > 0.5) hdec = Math.floor(hdec) + 1;
-    else hdec = Math.floor(hdec) + 0.5;
-
-    const hora2 = decAHora(hdec);
-
-    const libres2 = await labosLibres(dia, hora2);
-    const nuevos = libres2.filter(l => !libres.includes(l));
-    const tiempos2 = await Promise.all(nuevos.map(l => tiempoRestante(l, dia, hora2)));
-
     return {
-        ahora: { libres, tiempos },
-        luego: nuevos.length ? { hora: hora2, libres: nuevos, tiempos: tiempos2 } : null
+        ahora: { libres: libresAhora, tiempos: tiemposAhora },
+        luego: liberan
     };
 }
 
-// =========================
-// DETECCIÓN DÍA/HORA ACTUAL
-// =========================
-
+//---------------------------------------------
+// UI
+//---------------------------------------------
 function obtenerDiaYHoraActual() {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2,"0");
-    const mm = String(now.getMinutes()).padStart(2,"0");
-
-    const dias = ["Domingo","Lunes","Martes","Miercoles","Jueves","Viernes","Sabado"];
-    return {
-        diaActual: dias[now.getDay()],
-        horaActual: `${hh}:${mm}`
-    };
+    const ahora = new Date();
+    const h = String(ahora.getHours()).padStart(2,"0");
+    const m = String(ahora.getMinutes()).padStart(2,"0");
+    const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    return { diaActual: dias[ahora.getDay()], horaActual: `${h}:${m}` };
 }
-
-// =========================
-// INICIO AUTOMÁTICO
-// =========================
 
 window.onload = async () => {
-    const { diaActual, horaActual } = obtenerDiaYHoraActual();
 
+    const { diaActual, horaActual } = obtenerDiaYHoraActual();
     document.getElementById("info-actual").innerText =
         `Día detectado: ${diaActual} — Hora detectada: ${horaActual}`;
 
     const r = await aplicacion(diaActual, horaActual);
 
-    document.getElementById("resultado").innerText =
-        JSON.stringify(r, null, 2);
+    // -------------------------
+    // Cargar tabla 1 (libres ahora)
+    // -------------------------
+    const t1 = document.getElementById("tabla-ahora");
+    t1.innerHTML = "<tr><th>Labo</th><th>Tiempo libre</th></tr>";
+
+    r.ahora.libres.forEach((l, i) => {
+        t1.innerHTML += `<tr><td>${l}</td><td>${r.ahora.tiempos[i]}</td></tr>`;
+    });
+
+    // -------------------------
+    // Cargar tabla 2 (se liberan en 30 min)
+    // -------------------------
+    const t2 = document.getElementById("tabla-luego");
+    t2.innerHTML = "<tr><th>Labo</th><th>Se libera en</th><th>Tiempo libre después</th></tr>";
+
+    r.luego.forEach(obj => {
+        t2.innerHTML += `<tr>
+            <td>${obj.labo}</td>
+            <td>${obj.en}</td>
+            <td>${obj.librePor}</td>
+        </tr>`;
+    });
 };
