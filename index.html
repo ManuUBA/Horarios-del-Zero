@@ -1,33 +1,38 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Horarios del 0+∞ (UBA)</title>
-<style>
-body { font-family: Arial; margin: 20px; }
-table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-th { background: #eee; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horarios del 0+∞ (UBA)</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    h2 { margin-top: 30px; }
+  </style>
 </head>
 <body>
+  <h1>Horarios del 0+∞ (UBA)</h1>
 
-<h1>Horarios del 0+∞</h1>
-<p id="info-actual"></p>
+  <p id="info"></p>
 
-<h2>🟢 Labos libres ahora</h2>
-<table>
-<thead><tr><th>Labo</th><th>Tiempo libre</th></tr></thead>
-<tbody id="tabla-ahora"></tbody>
-</table>
+  <h2>🟢 Labos libres ahora</h2>
+  <table id="tablaAhora">
+    <thead>
+      <tr><th>Labo</th><th>Tiempo hasta que se ocupe</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-<h2>🕒 Labos que se liberan en ≤ 30 min</h2>
-<table>
-<thead><tr><th>Labo</th><th>Se libera en</th><th>Tiempo libre después</th></tr></thead>
-<tbody id="tabla-luego"></tbody>
-</table>
+  <h2>🕒 Labos que se liberan en ≤ 30 min</h2>
+  <table id="tablaLuego">
+    <thead>
+      <tr><th>Labo</th><th>Tiempo hasta que se ocupe</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
-<script src="app.js"></script>
-
+  <script src="app.js"></script>
 </body>
 </html>
