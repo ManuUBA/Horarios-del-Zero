@@ -1,7 +1,7 @@
 //---------------------------------------------
 // CONFIG
 //---------------------------------------------
-const base = "https://manuuba.github.io/Horarios-de-labos-zero/";
+const base = "https://github.com/ManuUBA/Horarios-de-labos-zero/data";
 async function cargarCSV(url) {
     const r = await fetch(url);
     const txt = await r.text();
